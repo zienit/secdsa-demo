@@ -1,9 +1,9 @@
 package nl.zienit;
 
-/**
- * Hello world!
- *
- */
+// "This is not the code you are looking for"
+//
+// Please find the demonstration code in the src/test folder
+
 public class App 
 {
     public static void main( String[] args )
