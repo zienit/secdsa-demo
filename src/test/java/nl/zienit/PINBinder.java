@@ -216,7 +216,7 @@ public class PINBinder {
         final var K = new SecretKeySpec(Arrays.copyOfRange(H, 16, 32), "AES");
 
         // 7: S-APP computes hash-key HK = EAES(K, 016) // AES-GCM
-        final var AES = Cipher.getInstance("AES", "BC");
+        final var AES = Cipher.getInstance("AES/ECB/NoPadding", "BC");
         AES.init(Cipher.ENCRYPT_MODE, K);
         final var HK = AES.doFinal(new byte[16]);
 
