@@ -357,7 +357,7 @@ public class SECDSA {
         }
     }
 
-    private record SigSF(byte[] H, ECPoint R, ECPoint S_accent, ECPoint S_double_accent, BigInteger N, Transcript DT1) {
+    private record SigSF(byte[] H, ECPoint R, ECPoint S_accent, ECPoint S_double_accent, byte[] N, Transcript DT1) {
     }
 
     private record SigRP(SigSF SigSF, ECPoint R_accent, Transcript DT2) {
@@ -368,7 +368,7 @@ public class SECDSA {
         private final BigInteger a;
         private final ECPoint G_accent;
         // 'session state'
-        private BigInteger N;
+        private byte[] N;
         private Certificate C;
         private RelyingParty RP;
 
@@ -377,7 +377,7 @@ public class SECDSA {
             G_accent = G.multiply(a);
         }
 
-        public BigInteger setupSession(byte[] CId, Certificate C, RelyingParty RP) {
+        public byte[] setupSession(byte[] CId, Certificate C, RelyingParty RP) {
             // 4: SF verifies certificate C // correctly signed not revoked
             // 5: SF computes H(CId) and verifies that certificate C is based on it
             assertThat(C.hashedCId, equalTo(H(CId)));
@@ -387,7 +387,8 @@ public class SECDSA {
             // 8: SF validates C, on success sends random nonce N to S-APP
             this.C = C;
             this.RP = RP;
-            N = P_256.getCurve().randomFieldElement(PRNG).toBigInteger();
+            N = new byte[32];
+            PRNG.nextBytes(N);
             return N;
         }
 
@@ -397,7 +398,7 @@ public class SECDSA {
             // Cf. Algorithm 5, nonce N from Line 8
             assertThat(N, equalTo(this.N));
 
-            assertThat(DTv(G_accent, SigSF.S_accent, SigSF.DT1, SigSF.S_double_accent, C.Y_accent, N.toByteArray()), equalTo(true));
+            assertThat(DTv(G_accent, SigSF.S_accent, SigSF.DT1, SigSF.S_double_accent, C.Y_accent, N), equalTo(true));
 
             // 23: SF converts the x-coordinate of R to integer r ̄; computes r = r ̄ mod q
             final var r = SigSF.R.getXCoord().toBigInteger().mod(q);
@@ -414,7 +415,7 @@ public class SECDSA {
             assertThat(R_accent, equalTo(SigSF.S_accent.multiply(e).add(SigSF.S_double_accent.multiply(r))));
 
             // 27: SF generates ZKP DT2 =DT(R→a R′|G′ =a·G,N) // Link ZKP to N
-            final var DT2 = DTc(SigSF.R, a, G, N.toByteArray());
+            final var DT2 = DTc(SigSF.R, a, G, N);
 
             // 28: SF sends signature SigRP = {SigSF,R′,DT2} to RP
             // mechanism depends on use case, cf. Section 4
@@ -465,7 +466,7 @@ public class SECDSA {
             final var Y_accent = C.Y_accent;
 
             // Verify DT2 on R′ , R, G′ , G, N on failure return False
-            assertThat(DTv(R, R_accent, DT2, G_accent, G, N.toByteArray()), equalTo(true));
+            assertThat(DTv(R, R_accent, DT2, G_accent, G, N), equalTo(true));
 
             // 6: Converts the x-coordinate of R to an integer r ̄; compute r = r ̄ mod q
             final var r = R.getXCoord().toBigInteger().mod(q);
@@ -480,7 +481,7 @@ public class SECDSA {
             assertThat(R_accent, equalTo(S_accent.multiply(e).add(S_double_accent.multiply(r))));
 
             // 10: Verify DT1 on S′, S′′, G′, Y′, N on failure return False
-            assertThat(DTv(G_accent, S_accent, DT1, S_double_accent, Y_accent, N.toByteArray()), equalTo(true));
+            assertThat(DTv(G_accent, S_accent, DT1, S_double_accent, Y_accent, N), equalTo(true));
 
             // 11: Return True
             return true;
@@ -574,7 +575,7 @@ public class SECDSA {
         final var S_double_accent = Y_accent.multiply(w);
 
         // 19: S-APP Generates ZKP DT1 =DT(G′ →w S′|S′′ =w·Y′,N) // Link ZKP to N
-        final var DT1 = DTc(G_accent, w, Y_accent, N.toByteArray());
+        final var DT1 = DTc(G_accent, w, Y_accent, N);
 
         // 20: S-APP sends SigSF ={H,(R,S′,S′′),N,DT1} to SF
         // 21: S-APP deletes all transient data
